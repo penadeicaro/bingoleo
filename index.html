@@ -6,186 +6,163 @@
 <title>Bingo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#14101f; --bg2:#1c1730; --card:#241d3b; --card2:#2d2549;
-    --line:#3a3160; --txt:#f3efe6; --mut:#a59fc0;
-    --acc:#ffb703; --acc-ink:#2a1d00; --teal:#2ec4b6; --pink:#ff5d8f;
-    --ok:#2ec4b6; --bad:#ff5d8f;
-    --r:14px; --r-sm:9px;
-    --f-head:'Bricolage Grotesque',system-ui,sans-serif;
-    --f-body:'DM Sans',system-ui,sans-serif;
+    --bg:#14101f; --card:#221b38; --card2:#2b2347; --line:#3a3160;
+    --txt:#f3efe6; --mut:#a59fc0;
+    --gold:#ffb703; --ink:#2a1d00; --teal:#2ec4b6; --pink:#ff5d8f;
+    --r:14px; --rs:10px;
+    --fh:'Bricolage Grotesque',system-ui,sans-serif;
+    --fb:'DM Sans',system-ui,sans-serif;
   }
-  *{box-sizing:border-box;margin:0;font-family:var(--f-body)}
-  html{scroll-behavior:smooth}
+  *{box-sizing:border-box;margin:0;font-family:var(--fb)}
+  [hidden]{display:none!important}
   body{
     background:
-      radial-gradient(900px 500px at 85% -10%,rgba(255,183,3,.10),transparent 60%),
-      radial-gradient(700px 500px at -10% 10%,rgba(46,196,182,.10),transparent 60%),
+      radial-gradient(900px 500px at 90% -10%,rgba(255,183,3,.10),transparent 60%),
+      radial-gradient(700px 500px at -10% 10%,rgba(46,196,182,.09),transparent 60%),
       var(--bg);
-    background-attachment:fixed;
-    color:var(--txt);min-height:100vh;line-height:1.5;
+    background-attachment:fixed;color:var(--txt);min-height:100vh;line-height:1.5;
   }
-  h1,h2,h3{font-family:var(--f-head);letter-spacing:-.01em}
+  h2,h3{font-family:var(--fh);letter-spacing:-.01em}
+  h3{font-size:18px;margin-bottom:12px}
   :focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+  .muted{color:var(--mut);font-size:13px}
 
-  /* Header */
   header{
-    position:sticky;top:0;z-index:20;
-    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-    padding:12px 24px;
-    background:rgba(20,16,31,.82);backdrop-filter:blur(10px);
+    position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:12px 24px;background:rgba(20,16,31,.85);backdrop-filter:blur(10px);
     border-bottom:1px solid var(--line);
   }
-  header h1{font-size:24px;font-weight:800;flex:1;white-space:nowrap}
-  #userInfo{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--mut)}
-  #userInfo img{width:30px;height:30px;border-radius:50%;border:2px solid var(--acc)}
-  #gameStatus{
+  .brand{font-family:var(--fh);font-weight:800;font-size:22px;flex:1}
+  .pill{
     font-size:13px;font-weight:500;padding:6px 14px;border-radius:999px;
-    background:var(--card);border:1px solid var(--line);color:var(--txt);
+    background:var(--card);border:1px solid var(--line);
   }
+  .pill.live{border-color:var(--teal);color:var(--teal)}
+  #userInfo{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--mut)}
+  #userInfo img{width:30px;height:30px;border-radius:50%;border:2px solid var(--gold)}
 
-  /* Buttons */
   button{
-    background:var(--acc);color:var(--acc-ink);border:0;border-radius:var(--r-sm);
+    background:var(--gold);color:var(--ink);border:0;border-radius:var(--rs);
     padding:9px 16px;cursor:pointer;font-size:14px;font-weight:700;
-    transition:transform .12s,filter .12s,background .12s;
+    transition:transform .12s,filter .12s;
   }
   button:hover{filter:brightness(1.08)}
   button:active{transform:scale(.97)}
-  button:disabled{opacity:.45;cursor:not-allowed;filter:none;transform:none}
+  button:disabled{opacity:.45;cursor:not-allowed;transform:none;filter:none}
   button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt);font-weight:500}
-  button.ghost:hover{background:var(--card);filter:none}
-  button.danger{background:var(--bad);color:#fff}
+  button.ghost:hover{background:var(--card2);filter:none}
+  button.small{padding:4px 10px;font-size:12px}
 
-  /* Login */
-  #loginBox{display:grid;place-items:center;height:70vh;text-align:center;padding:20px}
-  #loginBox p{
-    font-family:var(--f-head);font-size:22px;color:var(--txt);max-width:320px;
-    padding:36px 32px;border:1px dashed var(--line);border-radius:var(--r);background:var(--bg2);
+  .login{min-height:72vh;display:grid;place-items:center;padding:20px;text-align:center}
+  .login div{
+    max-width:360px;padding:40px 32px;border:1px dashed var(--line);
+    border-radius:var(--r);background:var(--card);
+  }
+  .login h2{font-size:30px;margin-bottom:10px}
+
+  main{max-width:1100px;margin:0 auto;padding:24px 20px 60px}
+  .layout{display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start}
+  .section-title{font-size:20px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:16px}
+  .flash{
+    background:var(--pink);color:#fff;border-radius:var(--rs);padding:10px 14px;
+    margin-bottom:16px;font-size:14px;font-weight:500;
   }
 
-  /* Layout */
-  main{max-width:920px;margin:0 auto;padding:24px 20px 60px}
-  #board{margin-bottom:8px}
-  .row{display:flex;gap:16px;align-items:flex-start}
-
-  .card{
-    background:var(--card);border:1px solid var(--line);border-radius:var(--r);
-    padding:18px;margin-bottom:16px;
-  }
-  .card h3{font-size:18px;margin-bottom:12px}
-  #adminPanel{
-    background:var(--bg2);border:1px solid var(--acc);border-radius:var(--r);
-    padding:18px;margin-bottom:20px;
-  }
-  #adminPanel h3,#adminPanel h2{color:var(--acc);margin-bottom:10px}
-  #adminPanel .row{align-items:center;flex-wrap:wrap}
-
-  /* Forms */
-  input,textarea,select{
+  .admin{border-color:var(--gold);background:var(--card2)}
+  .admin h2{color:var(--gold);font-size:20px;margin-bottom:8px}
+  .admin label{display:block;font-size:13px;color:var(--mut);margin-top:10px}
+  .admin .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .admin .row{display:flex;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  input,textarea{
     width:100%;background:var(--bg);border:1px solid var(--line);color:var(--txt);
-    border-radius:var(--r-sm);padding:10px 12px;margin:5px 0;font-size:14px;
-    transition:border-color .12s;
+    border-radius:var(--rs);padding:10px 12px;margin-top:6px;font-size:14px;
   }
-  input:focus,textarea:focus,select:focus{border-color:var(--acc);outline:none}
-  ::placeholder{color:var(--mut)}
-  textarea{resize:vertical;min-height:70px}
-  label{font-size:13px;color:var(--mut)}
+  input:focus,textarea:focus{border-color:var(--gold);outline:none}
+  textarea{resize:vertical;min-height:110px}
+  .msg{font-size:13px;color:var(--mut);margin-top:10px;min-height:1em}
 
-  /* Frases: cartela com entalhes laterais */
-  .phraseBox{
-    position:relative;
-    background:var(--card);border:1px solid var(--line);border-radius:var(--r);
-    padding:16px 20px;margin-bottom:12px;
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+  .tile{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;
     transition:border-color .15s;
   }
-  .phraseBox::before,.phraseBox::after{
-    content:"";position:absolute;top:50%;width:14px;height:14px;border-radius:50%;
-    background:var(--bg);border:1px solid var(--line);transform:translateY(-50%);
+  .tile:hover{border-color:#4d4378}
+  .tile.mine{border-color:var(--gold);background:linear-gradient(160deg,var(--card2),var(--card))}
+  .tile .text{font-size:16px;font-weight:500;line-height:1.4;min-height:2.8em}
+  .tile .meta{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .faces{display:flex;align-items:center;min-height:32px}
+  .av{
+    width:32px;height:32px;border-radius:50%;object-fit:cover;
+    border:2px solid var(--card);margin-left:-8px;background:var(--bg);flex:none;
   }
-  .phraseBox::before{left:-8px}
-  .phraseBox::after{right:-8px}
-  .phraseBox p{margin-bottom:12px;font-size:16px;font-weight:500;line-height:1.45}
-  .phraseBox.mine{border-color:var(--acc);background:linear-gradient(135deg,var(--card2),var(--card))}
-  .phraseBox.mine::before,.phraseBox.mine::after{border-color:var(--acc)}
-  .phraseBox.done,.phraseBox.complete{border-color:var(--ok)}
-  .phraseBox .muted{margin-top:8px}
+  .faces .av:first-child{margin-left:0}
+  .init{display:inline-grid;place-items:center;font-size:12px;font-weight:700;color:var(--mut)}
+  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-height:34px}
+  button.mark{background:var(--teal);color:#062b27;border-radius:999px;padding:8px 20px}
+  .badge{
+    font-size:13px;font-weight:700;color:var(--gold);
+    padding:6px 12px;border:1px solid var(--gold);border-radius:999px;
+  }
+  .empty{grid-column:1/-1;padding:40px;text-align:center;border:1px dashed var(--line);border-radius:var(--r);color:var(--mut)}
 
-  /* Votação (ganchos de estilo) */
-  .votes,.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-  .vote,button.vote{
-    background:transparent;color:var(--txt);border:1px solid var(--line);
-    font-weight:500;padding:7px 14px;border-radius:999px;
-  }
-  .vote:hover{border-color:var(--acc);background:var(--card2);filter:none}
-  .vote.yes,.vote.sim{border-color:var(--ok);color:var(--ok)}
-  .vote.no,.vote.nao{border-color:var(--bad);color:var(--bad)}
-  .vote.active,.vote.voted{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:700}
-  .vote.yes.active,.vote.sim.active{background:var(--ok);border-color:var(--ok);color:#062b27}
-  .vote.no.active,.vote.nao.active{background:var(--bad);border-color:var(--bad);color:#fff}
-
-  /* Avatares */
-  .avatars{display:flex;flex-wrap:wrap;gap:6px}
-  .circle{
-    width:36px;height:36px;border-radius:50%;background:var(--bg);
-    border:2px dashed var(--line);display:grid;place-items:center;
-    font-size:11px;color:var(--mut);overflow:hidden;flex:none;
-  }
-  .circle img{width:100%;height:100%;object-fit:cover}
-  .circle.empty::after{content:"?"}
-  .circle.filled,.circle.done,.circle:has(img){border:2px solid var(--teal)}
-
-  /* Placar */
-  .rank{
-    display:flex;align-items:center;gap:12px;padding:9px 0;
-    border-bottom:1px solid var(--line);font-size:14px;
-  }
+  .rank{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
   .rank:last-child{border-bottom:0}
-  .rank img{width:30px;height:30px;border-radius:50%;border:2px solid var(--line)}
-  .rank:first-child img{border-color:var(--acc)}
-  .rank:first-child{font-weight:700;color:var(--acc)}
+  .rank .pos{width:18px;color:var(--mut);font-weight:700;font-size:13px}
+  .rank .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rank b{font-family:var(--fh);font-size:15px}
+  .rank .av{width:28px;height:28px;margin:0}
+  .rank.winner{color:var(--gold);font-weight:700}
+  .rank.winner .av{border-color:var(--gold)}
 
-  /* Eventos */
-  .feed{max-height:340px;overflow:auto;padding:0}
-  .feed li{padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;list-style:none;color:var(--txt)}
+  .feed{list-style:none;max-height:360px;overflow:auto}
+  .feed li{padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
   .feed li:last-child{border-bottom:0}
 
-  .muted{color:var(--mut);font-size:13px}
-
-  /* Scroll */
-  *{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
-
-  /* Mobile */
-  @media (max-width:640px){
+  @media (max-width:820px){
+    .layout{grid-template-columns:1fr}
+    .admin .grid2{grid-template-columns:1fr}
+  }
+  @media (max-width:560px){
     header{padding:10px 14px}
-    header h1{font-size:20px}
+    .brand{font-size:19px}
     main{padding:16px 12px 48px}
-    .row{flex-direction:column}
-    .row>.card{width:100%;flex:none!important}
+    .board{grid-template-columns:1fr}
   }
-  @media (prefers-reduced-motion:reduce){
-    *{transition:none!important;scroll-behavior:auto!important}
-  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <header>
-  <h1>🎯 Bingo</h1>
-  <span id="gameStatus" class="muted">—</span>
-  <span id="userInfo"></span>
+  <div class="brand">🎯 Bingo</div>
+  <div id="gameStatus" class="pill">—</div>
+  <div id="userInfo"></div>
   <button id="authBtn" class="ghost">Entrar com Google</button>
 </header>
 
-<div id="loginBox"><p>Faça login para participar.</p></div>
+<section id="loginBox" class="login">
+  <div>
+    <h2>Bingoleo</h2>
+    <p class="muted">Entre com sua conta Google para marcar as frases.</p>
+  </div>
+</section>
 
-<main id="app" style="display:none">
-  <div id="adminPanel" style="display:none"></div>
-  <div id="board"></div>
-  <div class="row">
-    <div class="card" style="flex:1"><h3>Placar</h3><div id="ranking"></div></div>
-    <div class="card" style="flex:1"><h3>Eventos</h3><ul id="feed" class="feed"></ul></div>
+<main id="app" hidden>
+  <div id="flash" class="flash" hidden></div>
+  <section id="adminPanel" class="card admin" hidden></section>
+  <div class="layout">
+    <section>
+      <h2 class="section-title">Cartela</h2>
+      <div id="board" class="board"></div>
+    </section>
+    <aside>
+      <div class="card"><h3>Placar</h3><div id="ranking"></div></div>
+      <div class="card"><h3>Eventos</h3><ul id="feed" class="feed"></ul></div>
+    </aside>
   </div>
 </main>
 
