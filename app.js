@@ -440,14 +440,28 @@ async function resetGame() {
 
 // ---------- Board ----------
 
+function blockReason() {
+  if (!game) return "Nenhum jogo criado.";
+  if (game.status !== "active") return `Jogo com status "${game.status}". Só dá para marcar com status "active".`;
+  if (!game.startAt || !game.endAt) return "Jogo sem data de início ou fim.";
+  const now = Date.now();
+  if (now < game.startAt.toMillis()) return `O jogo começa em ${game.startAt.toDate().toLocaleString("pt-BR")}.`;
+  if (now > game.endAt.toMillis()) return `O jogo terminou em ${game.endAt.toDate().toLocaleString("pt-BR")}.`;
+  return "";
+}
+
 function renderBoard() {
+  const banner = !active() && user
+    ? `<div class="card" style="border-color:var(--bad)"><b>Votação bloqueada:</b> ${esc(blockReason())}</div>`
+    : "";
+
   if (!phrases.length) {
-    $("board").innerHTML =
+    $("board").innerHTML = banner +
       '<p class="muted">Nenhuma frase ainda.</p>';
     return;
   }
 
-  $("board").innerHTML = phrases.map(phrase => {
+  $("board").innerHTML = banner + phrases.map(phrase => {
     const markers = players
       .filter(player =>
         player.marks && player.marks[phrase.id]
