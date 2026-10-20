@@ -7,9 +7,14 @@ import { getFirestore, doc, getDoc, setDoc, deleteDoc, updateDoc, collection, ge
 import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 // ===== 1. COLOQUE AQUI SEU firebaseConfig (Firebase Console > Configurações do projeto) =====
-const firebaseConfig = { apiKey:"...", authDomain:"SEU-PROJETO.firebaseapp.com", projectId:"SEU-PROJETO",
-  storageBucket:"SEU-PROJETO.appspot.com", messagingSenderId:"...", appId:"..." };
-const VAPID_KEY = "COLE_SUA_VAPID_KEY_AQUI"; // Configurações do projeto > Cloud Messaging > Chaves do Web Push
+const firebaseConfig = {
+  apiKey: "AIzaSyCkRCAo16Kiv-AlxXg7jRc48bFT99p1nP0",
+  authDomain: "bingoleo.firebaseapp.com",
+  projectId: "bingoleo",
+  storageBucket: "bingoleo.firebasestorage.app",
+  messagingSenderId: "394932742416",
+  appId: "1:394932742416:web:9dc6f7d566c2fa35b8dd95"
+};
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
