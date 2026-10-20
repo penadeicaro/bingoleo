@@ -521,16 +521,9 @@ window.__mark = async phraseId => {
   try {
     if (!user || !active()) return;
 
-    const ref = doc(db, "game/current/players", user.uid);
-    const me = players.find(player => player.id === user.uid);
-
-    const marks = {
-      ...(me?.marks || {}),
-      [phraseId]: serverTimestamp()
-    };
-
+    // Só grava a marcação. Feed, bingo e vencedor são feitos pela Cloud Function.
     await setDoc(
-      ref,
+      doc(db, "game/current/players", user.uid),
       {
         name: user.displayName || "",
         photoURL: user.photoURL || "",
@@ -538,21 +531,6 @@ window.__mark = async phraseId => {
       },
       { merge: true }
     );
-
-    // O feed de marcação é gravado pela Cloud Function onMark.
-
-    if (Object.keys(marks).length >= phrases.length) {
-      await updateDoc(GAME, {
-        status: "finished",
-        winnerUid: user.uid,
-        winnerName: user.displayName || "Jogador"
-      });
-
-      await addDoc(collection(db, "game/current/feed"), {
-        ts: serverTimestamp(),
-        text: `BINGO! ${user.displayName || "Jogador"} venceu!`
-      });
-    }
   } catch (error) {
     showError("Erro ao marcar frase", error);
   }
