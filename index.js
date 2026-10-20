@@ -24,6 +24,14 @@ exports.onMark = onDocumentUpdated("game/current/players/{pid}", async (e) => {
   await sendAll("Nova marcação 🎯", `${name} marcou uma frase (${n}/${total})`);
   await db.collection("game/current/feed").add({ ts:admin.firestore.FieldValue.serverTimestamp(),
     text:`${name} marcou uma frase` });
+  if (n === total) {
+    const g = (await db.doc("game/current").get()).data();
+    if (g && g.status === "active") {
+      await db.doc("game/current").update({ status:"finished", winnerUid:e.params.pid, winnerName:name });
+      await db.collection("game/current/feed").add({ ts:admin.firestore.FieldValue.serverTimestamp(),
+        text:`BINGO! ${name} venceu!` });
+    }
+  }
   if (n === total - 1) {
     await sendAll("⚠️ Evento quente!", `${name} está a 1 frase do bingo!`);
     await db.collection("game/current/feed").add({ ts:admin.firestore.FieldValue.serverTimestamp(),
@@ -42,8 +50,7 @@ exports.finalize = onSchedule("every 1 minutes", async () => {
   const g = (await db.doc("game/current").get()).data();
   if (!g || g.status !== "active" || Date.now() <= g.endAt.toMillis()) return;
   const ps = (await db.collection("game/current/players").get()).docs
-    .map(d => ({ id:d.id, ...d.data() }))
-    .filter(p => Object.keys(p.marks || {}).length > 0);
+    .map(d => ({ id:d.id, ...d.data() }));
   const total = (await db.collection("game/current/phrases").get()).size;
   if (!ps.length) { await db.doc("game/current").update({ status:"finished" }); return; }
   const score = p => { const m = Object.entries(p.marks||{}); return m.length; };
