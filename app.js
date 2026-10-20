@@ -1,4 +1,3 @@
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth,
@@ -115,6 +114,21 @@ onAuthStateChanged(auth, async u => {
     } catch (error) {
       isAdmin = false;
       showError("Erro ao verificar administrador", error);
+    }
+
+    // Garante o documento do jogador (necessário para marcar frases),
+    // independente de notificações.
+    try {
+      await setDoc(
+        doc(db, "game/current/players", u.uid),
+        {
+          name: u.displayName || "",
+          photoURL: u.photoURL || ""
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      showError("Erro ao registrar jogador", error);
     }
 
     // Registro de notificações: falhas aqui não bloqueiam o acesso.
@@ -464,16 +478,24 @@ function renderBoard() {
            </button>`
         : "";
 
-    const clickable =
-      active() && user && !mine
-        ? `onclick="window.__mark('${phrase.id}')"
-           style="cursor:pointer"`
+    const canMark = active() && user && !mine;
+
+    const clickable = canMark
+      ? `onclick="window.__mark('${phrase.id}')"
+         style="cursor:pointer"`
+      : "";
+
+    const voteButton = canMark
+      ? `<button class="vote" onclick="window.__mark('${phrase.id}')">Marcar</button>`
+      : mine
+        ? '<span class="muted">✓ Marcada por você</span>'
         : "";
 
     return `
       <div class="phraseBox ${mine ? "mine" : ""}">
         <p>${esc(phrase.text)} ${unmarkButton}</p>
         <div class="avatars" ${clickable}>${circles}</div>
+        <div class="votes">${voteButton}</div>
       </div>
     `;
   }).join("");
@@ -493,12 +515,17 @@ window.__mark = async phraseId => {
       [phraseId]: serverTimestamp()
     };
 
-    await updateDoc(ref, { marks });
+    await setDoc(
+      ref,
+      {
+        name: user.displayName || "",
+        photoURL: user.photoURL || "",
+        marks: { [phraseId]: serverTimestamp() }
+      },
+      { merge: true }
+    );
 
-    await addDoc(collection(db, "game/current/feed"), {
-      ts: serverTimestamp(),
-      text: `${user.displayName || "Jogador"} marcou uma frase`
-    });
+    // O feed de marcação é gravado pela Cloud Function onMark.
 
     if (Object.keys(marks).length >= phrases.length) {
       await updateDoc(GAME, {
@@ -563,3 +590,6 @@ function renderRanking() {
     </div>
   `).join("");
 }
+
+// Atualiza o tabuleiro quando o jogo abre/fecha pelo horário.
+setInterval(() => { if (user) renderBoard(); }, 15000);
