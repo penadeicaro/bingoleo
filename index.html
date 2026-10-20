@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bingo</title>
+<style>
+  :root{--bg:#0f1115;--card:#1a1d26;--line:#2a2e3a;--txt:#e6e8ee;--mut:#8b90a0;--acc:#4f8cff}
+  *{box-sizing:border-box;margin:0;font-family:system-ui,sans-serif}
+  body{background:var(--bg);color:var(--txt);min-height:100vh}
+  header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
+  header h1{font-size:20px;flex:1}
+  button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
+  #loginBox{display:grid;place-items:center;height:70vh}
+  main{max-width:900px;margin:0 auto;padding:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  input,textarea{width:100%;background:#12141b;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px;margin:5px 0;font-size:14px}
+  .phraseBox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .phraseBox p{margin-bottom:10px;font-size:15px}
+  .phraseBox.mine{border-color:var(--acc)}
+  .avatars{display:flex;flex-wrap:wrap;gap:6px}
+  .circle{width:34px;height:34px;border-radius:50%;background:#12141b;border:2px solid var(--line);display:grid;place-items:center;font-size:11px;color:var(--mut);overflow:hidden;flex:none}
+  .circle img{width:100%;height:100%;object-fit:cover}
+  .circle.empty::after{content:"?"}
+  .rank{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .rank img{width:28px;height:28px;border-radius:50%}
+  .muted{color:var(--mut);font-size:13px}
+  .feed li{padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;list-style:none}
+  #gameStatus{font-size:13px;padding:6px 12px;border-radius:20px;background:var(--card);border:1px solid var(--line)}
+  .row{display:flex;gap:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎯 Bingo</h1>
+  <span id="gameStatus" class="muted">—</span>
+  <span id="userInfo"></span>
+  <button id="authBtn" class="ghost">Entrar com Google</button>
+</header>
+
+<div id="loginBox"><p class="muted">Faça login para participar.</p></div>
+
+<main id="app" style="display:none">
+  <div id="adminPanel" style="display:none"></div>
+  <div id="board"></div>
+  <div class="row">
+    <div class="card" style="flex:1"><h3>Placar</h3><div id="ranking"></div></div>
+    <div class="card" style="flex:1"><h3>Eventos</h3><ul id="feed" class="feed"></ul></div>
+  </div>
+</main>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
