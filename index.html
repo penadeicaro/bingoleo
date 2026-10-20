@@ -4,31 +4,170 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bingo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0f1115;--card:#1a1d26;--line:#2a2e3a;--txt:#e6e8ee;--mut:#8b90a0;--acc:#4f8cff}
-  *{box-sizing:border-box;margin:0;font-family:system-ui,sans-serif}
-  body{background:var(--bg);color:var(--txt);min-height:100vh}
-  header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
-  header h1{font-size:20px;flex:1}
-  button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px}
-  button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
-  #loginBox{display:grid;place-items:center;height:70vh}
-  main{max-width:900px;margin:0 auto;padding:20px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
-  input,textarea{width:100%;background:#12141b;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px;margin:5px 0;font-size:14px}
-  .phraseBox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-  .phraseBox p{margin-bottom:10px;font-size:15px}
-  .phraseBox.mine{border-color:var(--acc)}
+  :root{
+    --bg:#14101f; --bg2:#1c1730; --card:#241d3b; --card2:#2d2549;
+    --line:#3a3160; --txt:#f3efe6; --mut:#a59fc0;
+    --acc:#ffb703; --acc-ink:#2a1d00; --teal:#2ec4b6; --pink:#ff5d8f;
+    --ok:#2ec4b6; --bad:#ff5d8f;
+    --r:14px; --r-sm:9px;
+    --f-head:'Bricolage Grotesque',system-ui,sans-serif;
+    --f-body:'DM Sans',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;font-family:var(--f-body)}
+  html{scroll-behavior:smooth}
+  body{
+    background:
+      radial-gradient(900px 500px at 85% -10%,rgba(255,183,3,.10),transparent 60%),
+      radial-gradient(700px 500px at -10% 10%,rgba(46,196,182,.10),transparent 60%),
+      var(--bg);
+    background-attachment:fixed;
+    color:var(--txt);min-height:100vh;line-height:1.5;
+  }
+  h1,h2,h3{font-family:var(--f-head);letter-spacing:-.01em}
+  :focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+
+  /* Header */
+  header{
+    position:sticky;top:0;z-index:20;
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:12px 24px;
+    background:rgba(20,16,31,.82);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  header h1{font-size:24px;font-weight:800;flex:1;white-space:nowrap}
+  #userInfo{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--mut)}
+  #userInfo img{width:30px;height:30px;border-radius:50%;border:2px solid var(--acc)}
+  #gameStatus{
+    font-size:13px;font-weight:500;padding:6px 14px;border-radius:999px;
+    background:var(--card);border:1px solid var(--line);color:var(--txt);
+  }
+
+  /* Buttons */
+  button{
+    background:var(--acc);color:var(--acc-ink);border:0;border-radius:var(--r-sm);
+    padding:9px 16px;cursor:pointer;font-size:14px;font-weight:700;
+    transition:transform .12s,filter .12s,background .12s;
+  }
+  button:hover{filter:brightness(1.08)}
+  button:active{transform:scale(.97)}
+  button:disabled{opacity:.45;cursor:not-allowed;filter:none;transform:none}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt);font-weight:500}
+  button.ghost:hover{background:var(--card);filter:none}
+  button.danger{background:var(--bad);color:#fff}
+
+  /* Login */
+  #loginBox{display:grid;place-items:center;height:70vh;text-align:center;padding:20px}
+  #loginBox p{
+    font-family:var(--f-head);font-size:22px;color:var(--txt);max-width:320px;
+    padding:36px 32px;border:1px dashed var(--line);border-radius:var(--r);background:var(--bg2);
+  }
+
+  /* Layout */
+  main{max-width:920px;margin:0 auto;padding:24px 20px 60px}
+  #board{margin-bottom:8px}
+  .row{display:flex;gap:16px;align-items:flex-start}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+    padding:18px;margin-bottom:16px;
+  }
+  .card h3{font-size:18px;margin-bottom:12px}
+  #adminPanel{
+    background:var(--bg2);border:1px solid var(--acc);border-radius:var(--r);
+    padding:18px;margin-bottom:20px;
+  }
+  #adminPanel h3,#adminPanel h2{color:var(--acc);margin-bottom:10px}
+  #adminPanel .row{align-items:center;flex-wrap:wrap}
+
+  /* Forms */
+  input,textarea,select{
+    width:100%;background:var(--bg);border:1px solid var(--line);color:var(--txt);
+    border-radius:var(--r-sm);padding:10px 12px;margin:5px 0;font-size:14px;
+    transition:border-color .12s;
+  }
+  input:focus,textarea:focus,select:focus{border-color:var(--acc);outline:none}
+  ::placeholder{color:var(--mut)}
+  textarea{resize:vertical;min-height:70px}
+  label{font-size:13px;color:var(--mut)}
+
+  /* Frases: cartela com entalhes laterais */
+  .phraseBox{
+    position:relative;
+    background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+    padding:16px 20px;margin-bottom:12px;
+    transition:border-color .15s;
+  }
+  .phraseBox::before,.phraseBox::after{
+    content:"";position:absolute;top:50%;width:14px;height:14px;border-radius:50%;
+    background:var(--bg);border:1px solid var(--line);transform:translateY(-50%);
+  }
+  .phraseBox::before{left:-8px}
+  .phraseBox::after{right:-8px}
+  .phraseBox p{margin-bottom:12px;font-size:16px;font-weight:500;line-height:1.45}
+  .phraseBox.mine{border-color:var(--acc);background:linear-gradient(135deg,var(--card2),var(--card))}
+  .phraseBox.mine::before,.phraseBox.mine::after{border-color:var(--acc)}
+  .phraseBox.done,.phraseBox.complete{border-color:var(--ok)}
+  .phraseBox .muted{margin-top:8px}
+
+  /* Votação (ganchos de estilo) */
+  .votes,.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .vote,button.vote{
+    background:transparent;color:var(--txt);border:1px solid var(--line);
+    font-weight:500;padding:7px 14px;border-radius:999px;
+  }
+  .vote:hover{border-color:var(--acc);background:var(--card2);filter:none}
+  .vote.yes,.vote.sim{border-color:var(--ok);color:var(--ok)}
+  .vote.no,.vote.nao{border-color:var(--bad);color:var(--bad)}
+  .vote.active,.vote.voted{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:700}
+  .vote.yes.active,.vote.sim.active{background:var(--ok);border-color:var(--ok);color:#062b27}
+  .vote.no.active,.vote.nao.active{background:var(--bad);border-color:var(--bad);color:#fff}
+
+  /* Avatares */
   .avatars{display:flex;flex-wrap:wrap;gap:6px}
-  .circle{width:34px;height:34px;border-radius:50%;background:#12141b;border:2px solid var(--line);display:grid;place-items:center;font-size:11px;color:var(--mut);overflow:hidden;flex:none}
+  .circle{
+    width:36px;height:36px;border-radius:50%;background:var(--bg);
+    border:2px dashed var(--line);display:grid;place-items:center;
+    font-size:11px;color:var(--mut);overflow:hidden;flex:none;
+  }
   .circle img{width:100%;height:100%;object-fit:cover}
   .circle.empty::after{content:"?"}
-  .rank{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
-  .rank img{width:28px;height:28px;border-radius:50%}
+  .circle.filled,.circle.done,.circle:has(img){border:2px solid var(--teal)}
+
+  /* Placar */
+  .rank{
+    display:flex;align-items:center;gap:12px;padding:9px 0;
+    border-bottom:1px solid var(--line);font-size:14px;
+  }
+  .rank:last-child{border-bottom:0}
+  .rank img{width:30px;height:30px;border-radius:50%;border:2px solid var(--line)}
+  .rank:first-child img{border-color:var(--acc)}
+  .rank:first-child{font-weight:700;color:var(--acc)}
+
+  /* Eventos */
+  .feed{max-height:340px;overflow:auto;padding:0}
+  .feed li{padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;list-style:none;color:var(--txt)}
+  .feed li:last-child{border-bottom:0}
+
   .muted{color:var(--mut);font-size:13px}
-  .feed li{padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;list-style:none}
-  #gameStatus{font-size:13px;padding:6px 12px;border-radius:20px;background:var(--card);border:1px solid var(--line)}
-  .row{display:flex;gap:8px}
+
+  /* Scroll */
+  *{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+
+  /* Mobile */
+  @media (max-width:640px){
+    header{padding:10px 14px}
+    header h1{font-size:20px}
+    main{padding:16px 12px 48px}
+    .row{flex-direction:column}
+    .row>.card{width:100%;flex:none!important}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;scroll-behavior:auto!important}
+  }
 </style>
 </head>
 <body>
@@ -39,7 +178,7 @@
   <button id="authBtn" class="ghost">Entrar com Google</button>
 </header>
 
-<div id="loginBox"><p class="muted">Faça login para participar.</p></div>
+<div id="loginBox"><p>Faça login para participar.</p></div>
 
 <main id="app" style="display:none">
   <div id="adminPanel" style="display:none"></div>
