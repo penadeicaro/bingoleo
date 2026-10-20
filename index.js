@@ -42,7 +42,8 @@ exports.finalize = onSchedule("every 1 minutes", async () => {
   const g = (await db.doc("game/current").get()).data();
   if (!g || g.status !== "active" || Date.now() <= g.endAt.toMillis()) return;
   const ps = (await db.collection("game/current/players").get()).docs
-    .map(d => ({ id:d.id, ...d.data() }));
+    .map(d => ({ id:d.id, ...d.data() }))
+    .filter(p => Object.keys(p.marks || {}).length > 0);
   const total = (await db.collection("game/current/phrases").get()).size;
   if (!ps.length) { await db.doc("game/current").update({ status:"finished" }); return; }
   const score = p => { const m = Object.entries(p.marks||{}); return m.length; };
