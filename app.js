@@ -135,6 +135,9 @@ onAuthStateChanged(auth, async u => {
     ? `<img src="${esc(u.photoURL || "")}" alt="">
        <span>${esc(u.displayName || u.email || "")}</span>`
     : "";
+  // Só mostra login/jogo depois que o Firebase confirmou a sessão.
+  $("loadingBox").hidden = true;
+  $("authBtn").disabled = false;
   $("authBtn").textContent = u ? "Sair" : "Entrar com Google";
   $("loginBox").hidden = !!u;
   $("app").hidden = !u;
