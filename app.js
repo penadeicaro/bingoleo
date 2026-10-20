@@ -1,32 +1,14 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore,
-  doc,
-  getDoc,
-  setDoc,
-  deleteDoc,
-  updateDoc,
-  collection,
-  getDocs,
-  addDoc,
-  onSnapshot,
-  serverTimestamp,
-  query,
-  orderBy
+  getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs,
+  addDoc, deleteDoc, onSnapshot, serverTimestamp, query, orderBy, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  getMessaging,
-  getToken
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
-// Firebase
+// ---------- Configuração ----------
 const firebaseConfig = {
   apiKey: "AIzaSyCkRCAo16Kiv-AlxXg7jRc48bFT99p1nP0",
   authDomain: "bingoleo.firebaseapp.com",
@@ -35,53 +17,86 @@ const firebaseConfig = {
   messagingSenderId: "394932742416",
   appId: "1:394932742416:web:9dc6f7d566c2fa35b8dd95"
 };
-
 const VAPID_KEY =
   "BOkmSROFHMEjJR-9IFBCL7LJKmJLzwFGXVtKQUAKYI4PBAXfXJVOv-a1XrI9CKEXwj0aVupy45TmBj9TjfGF010";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const messaging = getMessaging(app);
+const provider = new GoogleAuthProvider();
+let messaging = null;
+try { messaging = getMessaging(app); } catch (e) { console.warn("Push indisponível:", e); }
 
 const GAME = doc(db, "game/current");
-const provider = new GoogleAuthProvider();
+const PHRASES = collection(db, "game/current/phrases");
+const PLAYERS = collection(db, "game/current/players");
+const FEED = collection(db, "game/current/feed");
+const playerRef = uid => doc(db, "game/current/players", uid);
 
+// ---------- Estado ----------
 let user = null;
 let isAdmin = false;
 let game = null;
 let phrases = [];
 let players = [];
+let feed = [];
 let started = false;
+let lastCanMark = null;
 
+// ---------- Utilidades ----------
 const $ = id => document.getElementById(id);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ms = t => (t?.toMillis ? t.toMillis() : (t instanceof Date ? t.getTime() : null));
+const fmt = t => {
+  const m = ms(t);
+  return m ? new Date(m).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
+};
+const marksOf = p => p?.marks || {};
+const me = () => players.find(p => p.id === user?.uid);
+const markedBy = phraseId =>
+  players
+    .filter(p => marksOf(p)[phraseId])
+    .sort((a, b) =>
+      (ms(marksOf(a)[phraseId]) ?? Number.MAX_SAFE_INTEGER) -
+      (ms(marksOf(b)[phraseId]) ?? Number.MAX_SAFE_INTEGER));
 
-const esc = value =>
-  String(value ?? "").replace(/[&<>"]/g, c => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;"
-  }[c]));
+const avatar = (p, cls = "av") =>
+  p.photoURL
+    ? `<img class="${cls}" src="${esc(p.photoURL)}" alt="" title="${esc(p.name || "")}">`
+    : `<span class="${cls} init" title="${esc(p.name || "")}">${esc((p.name || "?").trim()[0] || "?")}</span>`;
 
-function showError(context, error) {
-  console.error(`[Bingoleo] ${context}:`, error);
-
-  const message = error?.message || String(error);
-  $("gameStatus").textContent = `${context}: ${message}`;
+function flash(text) {
+  const box = $("flash");
+  box.textContent = text;
+  box.hidden = false;
+  clearTimeout(flash.t);
+  flash.t = setTimeout(() => { box.hidden = true; }, 5000);
 }
 
-// ---------- Auth ----------
+function say(el, text) { el.textContent = text; }
 
+// ---------- Estado do jogo ----------
+function gameState() {
+  if (!game) return "none";
+  if (game.status === "draft") return "draft";
+  if (game.status === "finished") return "finished";
+  const s = ms(game.startAt), e = ms(game.endAt);
+  if (!s || !e) return "draft";
+  const now = Date.now();
+  if (now < s) return "soon";
+  if (now > e) return "over";
+  return "live";
+}
+const canMark = () => !!user && gameState() === "live";
+
+// ---------- Autenticação ----------
 $("authBtn").onclick = async () => {
   try {
-    if (user) {
-      await signOut(auth);
-    } else {
-      await signInWithPopup(auth, provider);
-    }
-  } catch (error) {
-    showError("Erro de autenticação", error);
+    if (user) await signOut(auth);
+    else await signInWithPopup(auth, provider);
+  } catch (e) {
+    flash("Erro ao entrar: " + e.message);
   }
 };
 
@@ -90,498 +105,321 @@ onAuthStateChanged(auth, async u => {
   isAdmin = false;
 
   if (u) {
-    console.log("Conta autenticada:", u.email);
-
     try {
-      if (!u.email) {
-        throw new Error("A conta Google não retornou um e-mail.");
+      if (u.email) {
+        isAdmin = (await getDoc(doc(db, "admins", u.email))).exists();
       }
-
-      const adminRef = doc(db, "admins", u.email);
-      const adminSnapshot = await getDoc(adminRef);
-
-      isAdmin = adminSnapshot.exists();
-
-      console.log("Documento de administrador:", adminSnapshot.exists());
-
-      if (!isAdmin) {
-        console.warn(
-          "Admin não encontrado. Confira se o ID do documento " +
-          "em admins corresponde exatamente ao e-mail autenticado:",
-          u.email
-        );
-      }
-    } catch (error) {
-      isAdmin = false;
-      showError("Erro ao verificar administrador", error);
+    } catch (e) {
+      console.warn("Não foi possível checar admin:", e);
     }
 
-    // Garante o documento do jogador (necessário para marcar frases),
-    // independente de notificações.
+    // Cria/atualiza o perfil do jogador (sempre, antes de marcar).
     try {
-      await setDoc(
-        doc(db, "game/current/players", u.uid),
-        {
-          name: u.displayName || "",
-          photoURL: u.photoURL || ""
-        },
-        { merge: true }
-      );
-    } catch (error) {
-      showError("Erro ao registrar jogador", error);
+      await setDoc(playerRef(u.uid), {
+        name: u.displayName || "",
+        photoURL: u.photoURL || ""
+      }, { merge: true });
+    } catch (e) {
+      flash("Não foi possível entrar no placar: " + e.message);
     }
 
-    // Registro de notificações: falhas aqui não bloqueiam o acesso.
-    try {
-      const token = await getToken(messaging, {
-        vapidKey: VAPID_KEY
-      });
+    registerPush(u);
 
-      if (token) {
-        await setDoc(
-          doc(db, "game/current/players", u.uid),
-          {
-            name: u.displayName || "",
-            photoURL: u.photoURL || "",
-            fcmToken: token
-          },
-          { merge: true }
-        );
-      }
-    } catch (error) {
-      console.warn("Notificações indisponíveis:", error);
+    if (!started) {
+      started = true;
+      start();
     }
   }
 
   $("userInfo").innerHTML = u
-    ? `<img src="${esc(u.photoURL)}" width="28"
-         style="border-radius:50%;vertical-align:middle">
-       ${esc(u.displayName || u.email || "")}`
+    ? `<img src="${esc(u.photoURL || "")}" alt="">
+       <span>${esc(u.displayName || u.email || "")}</span>`
     : "";
-
   $("authBtn").textContent = u ? "Sair" : "Entrar com Google";
-  $("loginBox").style.display = u ? "none" : "grid";
-  $("app").style.display = u ? "block" : "none";
+  $("loginBox").hidden = !!u;
+  $("app").hidden = !u;
 
-  if (!u) {
-    $("adminPanel").style.display = "none";
-    $("gameStatus").textContent = "Faça login para participar.";
-    return;
-  }
-
-  if (isAdmin) {
-    console.log("Acesso administrativo autorizado.");
-  }
-
-  if (!started) {
-    started = true;
-    start();
-  }
-
-  renderGame();
+  render();
 });
 
-// ---------- Realtime ----------
-
-function start() {
-  onSnapshot(
-    GAME,
-    snapshot => {
-      game = snapshot.exists() ? snapshot.data() : null;
-      renderGame();
-    },
-    error => showError("Erro ao ler o jogo", error)
-  );
-
-  onSnapshot(
-    query(collection(db, "game/current/phrases"), orderBy("order")),
-    snapshot => {
-      phrases = snapshot.docs.map(d => ({
-        id: d.id,
-        ...d.data()
-      }));
-
-      renderBoard();
-      renderRanking();
-    },
-    error => showError("Erro ao ler frases", error)
-  );
-
-  onSnapshot(
-    collection(db, "game/current/players"),
-    snapshot => {
-      players = snapshot.docs.map(d => ({
-        id: d.id,
-        ...d.data()
-      }));
-
-      renderBoard();
-      renderRanking();
-    },
-    error => showError("Erro ao ler jogadores", error)
-  );
-
-  onSnapshot(
-    query(
-      collection(db, "game/current/feed"),
-      orderBy("ts", "desc")
-    ),
-    snapshot => {
-      $("feed").innerHTML = snapshot.docs
-        .slice(0, 20)
-        .map(d => `<li>${esc(d.data().text)}</li>`)
-        .join("");
-    },
-    error => showError("Erro ao ler eventos", error)
-  );
+async function registerPush(u) {
+  if (!messaging) return;
+  try {
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+    if (token) await setDoc(playerRef(u.uid), { fcmToken: token }, { merge: true });
+  } catch (e) {
+    console.warn("Notificações indisponíveis:", e);
+  }
 }
 
-const active = () =>
-  !!game &&
-  game.status === "active" &&
-  !!game.startAt &&
-  !!game.endAt &&
-  Date.now() >= game.startAt.toMillis() &&
-  Date.now() <= game.endAt.toMillis();
+// ---------- Tempo real ----------
+function start() {
+  const onErr = label => e => flash(`${label}: ${e.message}`);
 
-// ---------- Game ----------
+  onSnapshot(GAME, s => {
+    game = s.exists() ? s.data() : null;
+    render();
+  }, onErr("Erro ao ler o jogo"));
 
-function renderGame() {
-  if (!game) {
-    $("gameStatus").textContent = "Aguardando admin criar o jogo";
+  onSnapshot(query(PHRASES, orderBy("order")), s => {
+    phrases = s.docs.map(d => ({ id: d.id, ...d.data() }));
+    render();
+  }, onErr("Erro ao ler frases"));
 
-    // O painel precisa aparecer mesmo sem game/current.
-    if (isAdmin) {
-      renderAdmin();
-    } else {
-      $("adminPanel").style.display = "none";
-    }
+  onSnapshot(PLAYERS, s => {
+    players = s.docs.map(d => ({ id: d.id, ...d.data() }));
+    render();
+  }, onErr("Erro ao ler jogadores"));
 
-    return;
-  }
+  onSnapshot(query(FEED, orderBy("ts", "desc")), s => {
+    feed = s.docs.map(d => d.data());
+    renderFeed();
+  }, onErr("Erro ao ler eventos"));
+}
 
-  const status = {
-    draft: "Rascunho",
-    active: "Ativo",
-    finished: "Encerrado"
-  }[game.status] || "Status desconhecido";
+// Atualiza o cabeçalho e libera/bloqueia a cartela sem o usuário recarregar.
+setInterval(() => {
+  if (!user) return;
+  renderHeader();
+  if (canMark() !== lastCanMark) renderBoard();
+}, 1000);
 
-  const winner = game.winnerName
-    ? ` | 🏆 ${esc(game.winnerName)}`
-    : "";
-
-  $("gameStatus").textContent = `${status}${winner}`;
-
-  if (isAdmin) {
-    renderAdmin();
-  } else {
-    $("adminPanel").style.display = "none";
-  }
-
+// ---------- Renderização ----------
+function render() {
+  renderHeader();
+  renderAdmin();
   renderBoard();
   renderRanking();
 }
 
-// ---------- Admin ----------
+function renderHeader() {
+  const st = gameState();
+  const labels = {
+    none: "Sem jogo", draft: "Rascunho", soon: "Em breve",
+    live: "Ao vivo", over: "Encerrado", finished: "Encerrado"
+  };
+  let text = labels[st];
+  if (st === "soon") text += ` · começa ${fmt(game.startAt)}`;
+  if (st === "live") text += ` · termina ${fmt(game.endAt)}`;
+  if (game?.winnerName) text += ` · 🏆 ${game.winnerName}`;
 
+  const pill = $("gameStatus");
+  pill.textContent = text;
+  pill.classList.toggle("live", st === "live");
+}
+
+function renderFeed() {
+  $("feed").innerHTML = feed.length
+    ? feed.slice(0, 30).map(e => `<li>${esc(e.text)}</li>`).join("")
+    : '<li class="muted">Sem eventos ainda.</li>';
+}
+
+function renderRanking() {
+  const total = phrases.length;
+  const sorted = [...players].sort(
+    (a, b) => Object.keys(marksOf(b)).length - Object.keys(marksOf(a)).length
+  );
+
+  $("ranking").innerHTML = sorted.length
+    ? sorted.map((p, i) => {
+        const n = Object.keys(marksOf(p)).length;
+        const isWinner = game?.winnerUid && p.id === game.winnerUid;
+        const you = p.id === user?.uid ? ' <span class="muted">(você)</span>' : "";
+        return `
+          <div class="rank ${isWinner ? "winner" : ""}">
+            <span class="pos">${i + 1}</span>
+            ${avatar(p)}
+            <span class="name">${esc(p.name || "Jogador")}${you}</span>
+            <b>${n}/${total}</b>
+          </div>`;
+      }).join("")
+    : '<p class="muted">Ninguém entrou ainda.</p>';
+}
+
+function renderBoard() {
+  const box = $("board");
+  lastCanMark = canMark();
+
+  if (!phrases.length) {
+    box.innerHTML = `<div class="empty">
+      ${isAdmin ? "Nenhuma frase ainda. Crie o jogo no painel acima."
+                : "Aguarde o admin criar o jogo."}
+    </div>`;
+    return;
+  }
+
+  const open = canMark();
+  const mine = marksOf(me());
+
+  box.innerHTML = phrases.map(ph => {
+    const holders = markedBy(ph.id);
+    const marked = !!mine[ph.id];
+
+    const faces = holders.length
+      ? holders.map(p => avatar(p)).join("")
+      : '<span class="muted">Ninguém ainda</span>';
+
+    let action = "";
+    if (marked) action = '<span class="badge">✓ Você marcou</span>';
+    else if (open) action = `<button class="mark" data-mark="${esc(ph.id)}">Marcar</button>`;
+
+    const undo = isAdmin && holders.length
+      ? `<button class="ghost small" data-unmark="${esc(ph.id)}">Anular</button>`
+      : "";
+
+    return `
+      <article class="tile ${marked ? "mine" : ""}">
+        <p class="text">${esc(ph.text)}</p>
+        <div class="meta">
+          <div class="faces">${faces}</div>
+          <span class="muted">${holders.length} ${holders.length === 1 ? "marca" : "marcas"}</span>
+        </div>
+        <div class="actions">${action}${undo}</div>
+      </article>`;
+  }).join("");
+}
+
+// Ações da cartela por delegação (um listener só, sem onclick inline).
+$("board").addEventListener("click", e => {
+  const markBtn = e.target.closest("[data-mark]");
+  if (markBtn) return mark(markBtn.dataset.mark);
+  const undoBtn = e.target.closest("[data-unmark]");
+  if (undoBtn) return unmark(undoBtn.dataset.unmark);
+});
+
+// ---------- Admin ----------
 function renderAdmin() {
   const panel = $("adminPanel");
+  panel.hidden = !isAdmin;
+  if (!isAdmin) return;
 
-  // Corrige o display:none definido no index.html.
-  panel.style.display = "block";
+  const st = gameState();
+  const mode = st === "none" || st === "draft" ? "form" : "control";
 
-  if (game && game.status !== "draft") {
+  // Só redesenha quando o modo muda, para não apagar o que está sendo digitado.
+  if (panel.dataset.mode === mode) return;
+  panel.dataset.mode = mode;
+
+  if (mode === "control") {
     panel.innerHTML = `
-      <div class="card">
-        <h3>Admin</h3>
-        <p class="muted">
-          Jogo ${esc(game.status)}. Clique em uma foto marcada
-          para anular a marcação.
-        </p>
+      <h2>Jogo em andamento</h2>
+      <p class="muted">Para anular uma marcação, clique em "Anular" ao lado da frase.</p>
+      <div class="row">
         <button class="ghost" id="resetBtn">Zerar jogo</button>
       </div>
-    `;
-
-    $("resetBtn").onclick = async () => {
-      try {
-        await resetGame();
-      } catch (error) {
-        showError("Erro ao zerar jogo", error);
-      }
-    };
-
+      <p class="msg" id="adminMsg"></p>`;
+    $("resetBtn").onclick = resetGame;
     return;
   }
 
   panel.innerHTML = `
-    <div class="card">
-      <h3>Criar jogo (admin)</h3>
-      <label for="phrasesTxt">Uma frase por linha</label>
-      <textarea
-        id="phrasesTxt"
-        rows="8"
-        placeholder="Digite uma frase por linha"
-      ></textarea>
-
-      <div class="row">
-        <input type="datetime-local" id="startIn"
-               aria-label="Início do jogo">
-        <input type="datetime-local" id="endIn"
-               aria-label="Fim do jogo">
-      </div>
-
-      <button id="createBtn">Criar e iniciar</button>
-      <p id="createError" class="muted"></p>
+    <h2>Criar jogo</h2>
+    <label>Frases (uma por linha)
+      <textarea id="phrasesTxt" placeholder="Ex.: Alguém usou um emoji de café"></textarea>
+    </label>
+    <div class="grid2">
+      <label>Início <input type="datetime-local" id="startIn"></label>
+      <label>Fim <input type="datetime-local" id="endIn"></label>
     </div>
-  `;
+    <div class="row">
+      <button id="createBtn">Criar e iniciar</button>
+    </div>
+    <p class="msg" id="adminMsg"></p>`;
+  $("createBtn").onclick = createGame;
+}
 
-  $("createBtn").onclick = async () => {
-    const button = $("createBtn");
-    const errorBox = $("createError");
+async function deleteAll(colRef) {
+  const snap = await getDocs(colRef);
+  const batch = writeBatch(db);
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+}
 
-    try {
-      if (!isAdmin || !user) {
-        throw new Error("Sua conta não foi reconhecida como administradora.");
-      }
+// Apaga frases e feed e limpa as marcas de todos os jogadores.
+async function clearGameData() {
+  await deleteAll(PHRASES);
+  await deleteAll(FEED);
 
-      const list = $("phrasesTxt").value
-        .split("\n")
-        .map(s => s.trim())
-        .filter(Boolean);
+  const batch = writeBatch(db);
+  players
+    .filter(p => Object.keys(marksOf(p)).length)
+    .forEach(p => batch.update(playerRef(p.id), { marks: {} }));
+  await batch.commit();
+}
 
-      if (list.length === 0) {
-        throw new Error("Digite pelo menos uma frase.");
-      }
+async function createGame() {
+  const msg = $("adminMsg");
+  const btn = $("createBtn");
 
-      const startValue = $("startIn").value;
-      const endValue = $("endIn").value;
+  const list = $("phrasesTxt").value
+    .split("\n").map(s => s.trim()).filter(Boolean);
+  const start = new Date($("startIn").value);
+  const end = new Date($("endIn").value);
 
-      if (!startValue || !endValue) {
-        throw new Error("Preencha as datas de início e fim.");
-      }
+  if (list.length < 1) return say(msg, "Digite pelo menos uma frase.");
+  if (isNaN(start) || isNaN(end)) return say(msg, "Escolha as datas de início e fim.");
+  if (end <= start) return say(msg, "O fim precisa ser depois do início.");
+  if (end <= new Date()) return say(msg, "O fim precisa ser no futuro.");
 
-      const startDate = new Date(startValue);
-      const endDate = new Date(endValue);
-
-      if (
-        Number.isNaN(startDate.getTime()) ||
-        Number.isNaN(endDate.getTime())
-      ) {
-        throw new Error("Uma das datas é inválida.");
-      }
-
-      if (endDate <= startDate) {
-        throw new Error("O fim deve ser posterior ao início.");
-      }
-
-      button.disabled = true;
-      button.textContent = "Criando jogo...";
-      errorBox.textContent = "";
-
-      await setDoc(GAME, {
-        status: "active",
-        startAt: startDate,
-        endAt: endDate,
-        createdAt: serverTimestamp(),
-        winnerUid: null,
-        winnerName: null
-      });
-
-      for (let i = 0; i < list.length; i++) {
-        await addDoc(
-          collection(db, "game/current/phrases"),
-          {
-            text: list[i],
-            order: i
-          }
-        );
-      }
-
-      console.log("Jogo criado com sucesso.");
-    } catch (error) {
-      console.error("Erro ao criar jogo:", error);
-
-      errorBox.textContent =
-        `Não foi possível criar o jogo: ${error.message}`;
-
-      button.disabled = false;
-      button.textContent = "Criar e iniciar";
+  btn.disabled = true;
+  say(msg, "Criando jogo…");
+  try {
+    await clearGameData();
+    await setDoc(GAME, {
+      status: "active",
+      startAt: start,
+      endAt: end,
+      createdAt: serverTimestamp(),
+      winnerUid: null,
+      winnerName: null
+    });
+    for (const [i, text] of list.entries()) {
+      await addDoc(PHRASES, { text, order: i });
     }
-  };
+    say(msg, "");
+    flash("Jogo criado.");
+  } catch (e) {
+    say(msg, "Não deu certo: " + e.message);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function resetGame() {
-  if (!isAdmin) {
-    throw new Error("Apenas administradores podem zerar o jogo.");
-  }
-
-  const phraseSnapshots = await getDocs(
-    collection(db, "game/current/phrases")
-  );
-
-  for (const snapshot of phraseSnapshots.docs) {
-    await deleteDoc(snapshot.ref);
-  }
-
-  const feedSnapshots = await getDocs(
-    collection(db, "game/current/feed")
-  );
-
-  for (const snapshot of feedSnapshots.docs) {
-    await deleteDoc(snapshot.ref);
-  }
-
-  await updateDoc(GAME, {
-    status: "draft",
-    winnerUid: null,
-    winnerName: null
-  });
-}
-
-// ---------- Board ----------
-
-function blockReason() {
-  if (!game) return "Nenhum jogo criado.";
-  if (game.status !== "active") return `Jogo com status "${game.status}". Só dá para marcar com status "active".`;
-  if (!game.startAt || !game.endAt) return "Jogo sem data de início ou fim.";
-  const now = Date.now();
-  if (now < game.startAt.toMillis()) return `O jogo começa em ${game.startAt.toDate().toLocaleString("pt-BR")}.`;
-  if (now > game.endAt.toMillis()) return `O jogo terminou em ${game.endAt.toDate().toLocaleString("pt-BR")}.`;
-  return "";
-}
-
-function renderBoard() {
-  const banner = !active() && user
-    ? `<div class="card" style="border-color:var(--bad)"><b>Votação bloqueada:</b> ${esc(blockReason())}</div>`
-    : "";
-
-  if (!phrases.length) {
-    $("board").innerHTML = banner +
-      '<p class="muted">Nenhuma frase ainda.</p>';
-    return;
-  }
-
-  $("board").innerHTML = banner + phrases.map(phrase => {
-    const markers = players
-      .filter(player =>
-        player.marks && player.marks[phrase.id]
-      )
-      .sort((a, b) =>
-        a.marks[phrase.id].toMillis() -
-        b.marks[phrase.id].toMillis()
-      );
-
-    const circles = markers.map(player => `
-      <div class="circle" title="${esc(player.name || "")}">
-        <img src="${esc(player.photoURL || "")}" alt="">
-      </div>
-    `).join("") +
-      '<div class="circle empty"></div>'.repeat(
-        Math.max(players.length - markers.length, 0)
-      );
-
-    const mine = user &&
-      markers.some(player => player.id === user.uid);
-
-    const unmarkButton =
-      isAdmin && markers.length
-        ? `<button class="ghost"
-             style="padding:2px 8px;font-size:11px"
-             onclick="window.__unmark('${phrase.id}')">
-             Anular
-           </button>`
-        : "";
-
-    const canMark = active() && user && !mine;
-
-    const clickable = canMark
-      ? `onclick="window.__mark('${phrase.id}')"
-         style="cursor:pointer"`
-      : "";
-
-    const voteButton = canMark
-      ? `<button class="vote" onclick="window.__mark('${phrase.id}')">Marcar</button>`
-      : mine
-        ? '<span class="muted">✓ Marcada por você</span>'
-        : "";
-
-    return `
-      <div class="phraseBox ${mine ? "mine" : ""}">
-        <p>${esc(phrase.text)} ${unmarkButton}</p>
-        <div class="avatars" ${clickable}>${circles}</div>
-        <div class="votes">${voteButton}</div>
-      </div>
-    `;
-  }).join("");
-}
-
-// ---------- Actions ----------
-
-window.__mark = async phraseId => {
   try {
-    if (!user || !active()) return;
-
-    // Só grava a marcação. Feed, bingo e vencedor são feitos pela Cloud Function.
-    await setDoc(
-      doc(db, "game/current/players", user.uid),
-      {
-        name: user.displayName || "",
-        photoURL: user.photoURL || "",
-        marks: { [phraseId]: serverTimestamp() }
-      },
-      { merge: true }
-    );
-  } catch (error) {
-    showError("Erro ao marcar frase", error);
+    await clearGameData();
+    await updateDoc(GAME, { status: "draft", winnerUid: null, winnerName: null });
+    flash("Jogo zerado.");
+  } catch (e) {
+    flash("Erro ao zerar: " + e.message);
   }
-};
+}
 
-window.__unmark = async phraseId => {
+// ---------- Ações de jogo ----------
+async function mark(phraseId) {
+  if (!canMark()) return flash("A cartela só está aberta durante o jogo.");
+  if (marksOf(me())[phraseId]) return;
+
   try {
-    if (!isAdmin) {
-      throw new Error("Apenas administradores podem anular marcações.");
+    await setDoc(playerRef(user.uid), {
+      name: user.displayName || "",
+      photoURL: user.photoURL || "",
+      marks: { [phraseId]: serverTimestamp() }
+    }, { merge: true });
+  } catch (e) {
+    flash("Não foi possível marcar: " + e.message);
+  }
+}
+
+async function unmark(phraseId) {
+  if (!isAdmin) return;
+  try {
+    for (const p of players.filter(p => marksOf(p)[phraseId])) {
+      const marks = { ...marksOf(p) };
+      delete marks[phraseId];
+      await updateDoc(playerRef(p.id), { marks });
     }
-
-    const player = players.find(p =>
-      p.marks && p.marks[phraseId]
-    );
-
-    if (!player) return;
-
-    const marks = { ...player.marks };
-    delete marks[phraseId];
-
-    await updateDoc(
-      doc(db, "game/current/players", player.id),
-      { marks }
-    );
-
-    await addDoc(collection(db, "game/current/feed"), {
-      ts: serverTimestamp(),
-      text: `Admin anulou marcação de ${player.name || player.id}`
-    });
-  } catch (error) {
-    showError("Erro ao anular marcação", error);
+  } catch (e) {
+    flash("Erro ao anular: " + e.message);
   }
-};
-
-// ---------- Ranking ----------
-
-function renderRanking() {
-  const sorted = [...players].sort(
-    (a, b) =>
-      Object.keys(b.marks || {}).length -
-      Object.keys(a.marks || {}).length
-  );
-
-  $("ranking").innerHTML = sorted.map(player => `
-    <div class="rank">
-      <img src="${esc(player.photoURL || "")}" alt="">
-      <span style="flex:1">${esc(player.name || "?")}</span>
-      <b>${Object.keys(player.marks || {}).length}/${phrases.length}</b>
-    </div>
-  `).join("");
 }
-
-// Atualiza o tabuleiro quando o jogo abre/fecha pelo horário.
-setInterval(() => { if (user) renderBoard(); }, 15000);
