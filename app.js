@@ -33,6 +33,7 @@ const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","
 $("authBtn").onclick = () => user ? signOut(auth) : signInWithPopup(auth, provider);
 onAuthStateChanged(auth, async u => {
   user = u;
+    if (u) console.log("MEU EMAIL FIREBASE:", u.email);
   if (u) {
     const a = await getDoc(doc(db, "admins", u.email));
     isAdmin = a.exists();
