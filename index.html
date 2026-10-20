@@ -141,12 +141,16 @@
   <div class="brand">🎯 Bingo</div>
   <div id="gameStatus" class="pill">—</div>
   <div id="userInfo"></div>
-  <button id="authBtn" class="ghost">Entrar com Google</button>
+  <button id="authBtn" class="ghost" disabled>Carregando…</button>
 </header>
 
-<section id="loginBox" class="login">
+<section id="loadingBox" class="login">
+  <p class="muted">Carregando…</p>
+</section>
+
+<section id="loginBox" class="login" hidden>
   <div>
-    <h2>Bingoleo</h2>
+    <h2>Bingo do grupo</h2>
     <p class="muted">Entre com sua conta Google para marcar as frases.</p>
   </div>
 </section>
